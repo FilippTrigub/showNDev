@@ -22,7 +22,6 @@ from mongodb.content import content_controller, ContentModel
 
 load_dotenv()
 
-
 SOCIAL_ENV_FIELD_MAP: Dict[str, str] = {
     "twitter_api_key": "TWITTER_API_KEY",
     "twitter_api_secret_key": "TWITTER_API_SECRET_KEY",
@@ -67,43 +66,6 @@ def _apply_social_env_updates(env_updates: Dict[str, Optional[str]]) -> None:
     if not env_updates:
         return
     update_mcp_server_env(env_updates, SOCIAL_ENV_TARGET_SERVERS)
-
-
-@app.get("/user-secrets/social")
-async def get_social_secrets_status():
-    return {"status": _build_social_status()}
-
-
-@app.post("/user-secrets/social")
-async def set_social_secrets(payload: SocialSecretsPayload):
-    payload_data = payload.dict(exclude_unset=True)
-    if not payload_data:
-        raise HTTPException(status_code=400, detail="No social secret fields provided.")
-
-    env_updates = _transform_social_payload(payload_data)
-    if not env_updates:
-        raise HTTPException(status_code=400, detail="No social secret fields matched.")
-
-    _apply_social_env_updates(env_updates)
-
-    applied = [key for key, value in env_updates.items() if value is not None]
-    cleared = [key for key, value in env_updates.items() if value is None]
-
-    return {
-        "status": _build_social_status(),
-        "applied": applied,
-        "cleared": cleared,
-    }
-
-
-@app.delete("/user-secrets/social")
-async def clear_social_secrets():
-    env_updates = {env_key: None for env_key in SOCIAL_ENV_FIELD_MAP.values()}
-    _apply_social_env_updates(env_updates)
-    return {
-        "status": _build_social_status(),
-        "cleared": list(env_updates.keys()),
-    }
 
 
 def serialize_objectid(item_dict):
@@ -197,6 +159,43 @@ def get_mongodb_client(uri):
     return pymongo.MongoClient(uri, tlsAllowInvalidCertificates=True)
 
 
+@app.get("/user-secrets/social")
+async def get_social_secrets_status():
+    return {"status": _build_social_status()}
+
+
+@app.post("/user-secrets/social")
+async def set_social_secrets(payload: SocialSecretsPayload):
+    payload_data = payload.dict(exclude_unset=True)
+    if not payload_data:
+        raise HTTPException(status_code=400, detail="No social secret fields provided.")
+
+    env_updates = _transform_social_payload(payload_data)
+    if not env_updates:
+        raise HTTPException(status_code=400, detail="No social secret fields matched.")
+
+    _apply_social_env_updates(env_updates)
+
+    applied = [key for key, value in env_updates.items() if value is not None]
+    cleared = [key for key, value in env_updates.items() if value is None]
+
+    return {
+        "status": _build_social_status(),
+        "applied": applied,
+        "cleared": cleared,
+    }
+
+
+@app.delete("/user-secrets/social")
+async def clear_social_secrets():
+    env_updates = {env_key: None for env_key in SOCIAL_ENV_FIELD_MAP.values()}
+    _apply_social_env_updates(env_updates)
+    return {
+        "status": _build_social_status(),
+        "cleared": list(env_updates.keys()),
+    }
+
+
 @app.post("/generate-content")
 async def generate_content(request: GenerateRequest):
     prompts_data = load_prompts()
@@ -231,7 +230,7 @@ async def generate_content(request: GenerateRequest):
     for prompt_config in prompts:
         prompt_name = prompt_config.get('name', 'unknown')
         prompt_content = prompt_config.get('content', '')
-        server_name = prompt_config.get('server', 'blackbox')  # Default to blackbox
+        server_name = prompt_config.get('server', 'openai')  # Default to blackbox
 
         context_block = (
             "\n\n=== Context for Generation ===\n"
