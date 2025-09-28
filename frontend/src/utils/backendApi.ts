@@ -1,5 +1,6 @@
 // Backend API integration for FastAPI + MongoDB backend
 import { fetchWithExponentialBackoff } from './api';
+import { SocialEnvValues, toSocialEnvApiPayload } from '../types/social';
 
 const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL as string) || 'http://localhost:8001';
 
@@ -142,6 +143,39 @@ export const approveAndPost = async (contentId: string): Promise<void> => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
     });
+};
+
+export interface SocialEnvStatusResponse {
+    status: Record<string, boolean>;
+    applied?: string[];
+    cleared?: string[];
+}
+
+export const saveSocialEnvSecrets = async (values: SocialEnvValues): Promise<SocialEnvStatusResponse> => {
+    const payload = toSocialEnvApiPayload(values);
+    const response = await fetchWithExponentialBackoff(`${BACKEND_URL}/user-secrets/social`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+
+    return response.json();
+};
+
+export const clearSocialEnvSecrets = async (): Promise<SocialEnvStatusResponse> => {
+    const response = await fetchWithExponentialBackoff(`${BACKEND_URL}/user-secrets/social`, {
+        method: 'DELETE',
+    });
+
+    return response.json();
+};
+
+export const fetchSocialEnvStatus = async (): Promise<SocialEnvStatusResponse> => {
+    const response = await fetchWithExponentialBackoff(`${BACKEND_URL}/user-secrets/social`, {
+        method: 'GET',
+    });
+
+    return response.json();
 };
 
 // Mock data for when backend is not available

@@ -3,48 +3,73 @@ import React from 'react';
 interface HeaderProps {
     tone: number;
     onToneChange: (tone: number) => void;
-    onToggleSidebar: () => void;
+    onToggleHistory: () => void;
+    onOpenSocialSettings: () => void;
+    socialEnvConfigured: boolean;
+    historyOpen: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ tone, onToneChange, onToggleSidebar }) => {
+const Header: React.FC<HeaderProps> = ({
+    tone,
+    onToneChange,
+    onToggleHistory,
+    onOpenSocialSettings,
+    socialEnvConfigured,
+    historyOpen,
+}) => {
     return (
-        <header className="relative p-8 text-center">
-            <button
-                className="lg:hidden fixed top-6 left-6 z-[60] p-3 modern-button bg-white/20 backdrop-blur-lg rounded-2xl shadow-lg border border-white/30"
-                onClick={onToggleSidebar}
-            >
-                <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
-                </svg>
-            </button>
+        <header className="border-b border-slate-800 bg-slate-950">
+            <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            className="lg:hidden rounded-lg border border-slate-800 px-3 py-2 text-sm font-medium text-slate-200 hover:border-slate-700 hover:bg-slate-900"
+                            onClick={onToggleHistory}
+                        >
+                            {historyOpen ? 'Hide History' : 'Show History'}
+                        </button>
+                        <div>
+                            <h1 className="text-2xl font-semibold text-slate-100">AI Content Manager</h1>
+                            <p className="text-sm text-slate-400">
+                                Review and post AI-generated updates across social channels.
+                            </p>
+                        </div>
+                    </div>
+                </div>
 
-            <div className="floating">
-                <h1 className="text-6xl font-bold text-white mb-4 bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent">
-                    AI Content Manager
-                </h1>
-                <p className="text-xl text-white/80 font-medium max-w-2xl mx-auto">
-                    Review and manage AI-generated social media content from your repositories
-                </p>
-            </div>
-
-            {/* Tone Control */}
-            <div className="mt-8 max-w-md mx-auto">
-                <div className="backdrop-filter backdrop-blur-lg bg-white/10 rounded-3xl p-6 border border-white/20">
-                    <label className="block text-white font-semibold mb-3">Content Tone</label>
-                    <div className="knob-container">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                    <div className="flex w-full flex-col">
+                        <label className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Content Tone
+                        </label>
                         <input
                             type="range"
                             min="0"
                             max="100"
                             value={tone}
-                            onChange={(e) => onToneChange(Number(e.target.value))}
-                            className="w-full"
+                            onChange={(event) => onToneChange(Number(event.target.value))}
+                            className="mt-2 h-2 w-full rounded-full bg-slate-800 accent-indigo-400"
                         />
+                        <div className="mt-1 flex justify-between text-xs text-slate-500">
+                            <span>Formal</span>
+                            <span>Casual</span>
+                        </div>
                     </div>
-                    <div className="flex justify-between text-sm text-white/70 mt-2">
-                        <span>Professional</span>
-                        <span>Casual</span>
-                    </div>
+
+                    <button
+                        type="button"
+                        className="flex items-center gap-2 rounded-lg border border-indigo-500/70 px-4 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/10"
+                        onClick={onOpenSocialSettings}
+                    >
+                        <span role="img" aria-label="settings">🔐</span>
+                        Social Credentials
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                            socialEnvConfigured ? 'bg-emerald-500/20 text-emerald-200' : 'bg-amber-500/20 text-amber-200'
+                        }`}>
+                            {socialEnvConfigured ? 'Ready' : 'Set up'}
+                        </span>
+                    </button>
                 </div>
             </div>
         </header>

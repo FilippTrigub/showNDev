@@ -1,5 +1,6 @@
 import os
 from contextlib import asynccontextmanager
+from typing import Dict, Optional
 
 import yaml
 import pymongo
@@ -9,11 +10,100 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 from bson import ObjectId
-from executor import execute_mcp_client, execute_with_fallback, get_error_summary, get_performance_summary, \
-    validate_server_by_platform
+from executor import (
+    execute_mcp_client,
+    execute_with_fallback,
+    get_error_summary,
+    get_performance_summary,
+    update_mcp_server_env,
+    validate_server_by_platform,
+)
 from mongodb.content import content_controller, ContentModel
 
 load_dotenv()
+
+
+SOCIAL_ENV_FIELD_MAP: Dict[str, str] = {
+    "twitter_api_key": "TWITTER_API_KEY",
+    "twitter_api_secret_key": "TWITTER_API_SECRET_KEY",
+    "twitter_access_token": "TWITTER_ACCESS_TOKEN",
+    "twitter_access_token_secret": "TWITTER_ACCESS_TOKEN_SECRET",
+    "bluesky_identifier": "BLUESKY_IDENTIFIER",
+    "bluesky_app_password": "BLUESKY_APP_PASSWORD",
+    "bluesky_service_url": "BLUESKY_SERVICE_URL",
+    "linkedin_client_id": "LINKEDIN_CLIENT_ID",
+    "linkedin_client_secret": "LINKEDIN_CLIENT_SECRET",
+    "linkedin_redirect_uri": "LINKEDIN_REDIRECT_URI",
+}
+
+SOCIAL_ENV_TARGET_SERVERS = ["twitter", "bluesky", "linkedin"]
+
+
+def _normalize_secret_value(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    trimmed = value.strip()
+    return trimmed or None
+
+
+def _transform_social_payload(payload: Dict[str, Optional[str]]) -> Dict[str, Optional[str]]:
+    env_updates: Dict[str, Optional[str]] = {}
+    for field, raw_value in payload.items():
+        env_key = SOCIAL_ENV_FIELD_MAP.get(field)
+        if not env_key:
+            continue
+        env_updates[env_key] = _normalize_secret_value(raw_value)
+    return env_updates
+
+
+def _build_social_status() -> Dict[str, bool]:
+    status: Dict[str, bool] = {}
+    for field, env_key in SOCIAL_ENV_FIELD_MAP.items():
+        status[field] = bool(os.getenv(env_key))
+    return status
+
+
+def _apply_social_env_updates(env_updates: Dict[str, Optional[str]]) -> None:
+    if not env_updates:
+        return
+    update_mcp_server_env(env_updates, SOCIAL_ENV_TARGET_SERVERS)
+
+
+@app.get("/user-secrets/social")
+async def get_social_secrets_status():
+    return {"status": _build_social_status()}
+
+
+@app.post("/user-secrets/social")
+async def set_social_secrets(payload: SocialSecretsPayload):
+    payload_data = payload.dict(exclude_unset=True)
+    if not payload_data:
+        raise HTTPException(status_code=400, detail="No social secret fields provided.")
+
+    env_updates = _transform_social_payload(payload_data)
+    if not env_updates:
+        raise HTTPException(status_code=400, detail="No social secret fields matched.")
+
+    _apply_social_env_updates(env_updates)
+
+    applied = [key for key, value in env_updates.items() if value is not None]
+    cleared = [key for key, value in env_updates.items() if value is None]
+
+    return {
+        "status": _build_social_status(),
+        "applied": applied,
+        "cleared": cleared,
+    }
+
+
+@app.delete("/user-secrets/social")
+async def clear_social_secrets():
+    env_updates = {env_key: None for env_key in SOCIAL_ENV_FIELD_MAP.values()}
+    _apply_social_env_updates(env_updates)
+    return {
+        "status": _build_social_status(),
+        "cleared": list(env_updates.keys()),
+    }
 
 
 def serialize_objectid(item_dict):
@@ -59,6 +149,7 @@ class GenerateRequest(BaseModel):
     branch: str
     summary: str
     timestamp: str  # ISO format
+    product_description: Optional[str] = None
 
 
 class RephraseRequest(BaseModel):
@@ -78,6 +169,22 @@ class ContentResponse(BaseModel):
     content: str
     status: str
     message: str
+
+
+class SocialSecretsPayload(BaseModel):
+    twitter_api_key: Optional[str] = None
+    twitter_api_secret_key: Optional[str] = None
+    twitter_access_token: Optional[str] = None
+    twitter_access_token_secret: Optional[str] = None
+    bluesky_identifier: Optional[str] = None
+    bluesky_app_password: Optional[str] = None
+    bluesky_service_url: Optional[str] = None
+    linkedin_client_id: Optional[str] = None
+    linkedin_client_secret: Optional[str] = None
+    linkedin_redirect_uri: Optional[str] = None
+
+    class Config:
+        extra = "forbid"
 
 
 def load_prompts():
@@ -108,7 +215,8 @@ async def generate_content(request: GenerateRequest):
         "branch": request.branch,
         "summary": request.summary,
         "timestamp": request.timestamp,
-        "created_at": request.timestamp
+        "created_at": request.timestamp,
+        "product_description": request.product_description
     }
     summary_result = summaries_collection.insert_one(summary_doc)
 
@@ -125,9 +233,21 @@ async def generate_content(request: GenerateRequest):
         prompt_content = prompt_config.get('content', '')
         server_name = prompt_config.get('server', 'blackbox')  # Default to blackbox
 
+        context_block = (
+            "\n\n=== Context for Generation ===\n"
+            f"Repository: {request.repository}\n"
+            f"Branch: {request.branch}\n"
+            f"Commit SHA: {request.commit_sha}\n"
+            f"Summary: {request.summary}\n"
+            f"Product Description: {request.product_description or 'Not provided'}\n"
+            f"Timestamp: {request.timestamp}\n"
+        )
+
+        rendered_prompt = f"{prompt_content.strip()}{context_block}"
+
         # Execute prompt on specified server
         executor_results = await execute_mcp_client(
-            prompt=prompt_content,
+            prompt=rendered_prompt,
             server_names=[server_name, 'mongodb'],
             prompt_name=prompt_name
         )
@@ -140,6 +260,7 @@ async def generate_content(request: GenerateRequest):
                 "commit_sha": request.commit_sha,
                 "branch": request.branch,
                 "summary": request.summary,
+                "product_description": request.product_description,
                 "timestamp": request.timestamp,
                 "prompt_name": result.prompt_name,
                 "prompt_content": prompt_content,
@@ -172,7 +293,8 @@ async def generate_content(request: GenerateRequest):
             "commit_sha": request.commit_sha,
             "branch": request.branch,
             "summary": request.summary,
-            "timestamp": request.timestamp
+            "timestamp": request.timestamp,
+            "product_description": request.product_description
         },
         "results": generated_contents
     }

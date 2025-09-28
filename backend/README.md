@@ -1,28 +1,3 @@
-# BBAI MCP Client
-
-This is the MCP Client component for the AI Content Publisher project. It provides an API to generate content using the MCP server and save it to MongoDB.
-
-## Setup
-
-1. Install dependencies using UV:
-   ```
-   uv sync
-   ```
-
-2. Set up environment variables in `.env`:
-   ```
-   MONGODB_URI=your_mongodb_uri
-   MCP_SERVER_URL=your_mcp_server_url
-   MOCK_MCP=false
-   ```
-
-3. Run the API server:
-   ```
-   uv run python generate_content.py
-   ```
-
-The server will start on http://localhost:8000.
-
 ## API Usage
 
 ### Generate Content
