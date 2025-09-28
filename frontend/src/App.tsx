@@ -4,7 +4,9 @@ import { getContentItems, updateContentStatus, updateContentText, testBackendCon
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import PostCard from './components/PostCard';
+import SocialEnvModal from './components/SocialEnvModal';
 import { Post, PushHistory } from './types/shared';
+import { useSocialEnv } from './hooks/useSocialEnv';
 
 // Convert ContentItem to Post format for UI compatibility
 const convertContentItemToPost = (item: ContentItem): Post => ({
@@ -30,9 +32,19 @@ const App: React.FC = () => {
     const [currentPushId, setCurrentPushId] = useState<string | null>(null);
     const [tone, setTone] = useState<number>(50);
     const [notification, setNotification] = useState<string>('');
-    const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+    const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<{ [key: string]: boolean }>({});
     const [backendConnected, setBackendConnected] = useState<boolean>(false);
+    const [isSocialModalOpen, setIsSocialModalOpen] = useState<boolean>(false);
+
+    const {
+        values: socialEnvValues,
+        saveValues: saveSocialEnvValues,
+        clearValues: clearSocialEnvValues,
+        status: socialEnvStatus,
+        isSyncing: socialEnvSyncing,
+        error: socialEnvError,
+    } = useSocialEnv();
 
     const messageTimeoutRef = useRef<number | null>(null);
 
@@ -149,14 +161,19 @@ const App: React.FC = () => {
         }, 3000);
     };
 
+    const handleSaveSocialEnv = async (nextValues: typeof socialEnvValues) => {
+        await saveSocialEnvValues(nextValues);
+    };
+
+    const handleClearSocialEnv = async () => {
+        await clearSocialEnvValues();
+    };
+
     const loadPush = (pushId: string) => {
         const push = postHistory.find(p => p.id === pushId);
         if (push) {
             setPosts(push.posts);
             setCurrentPushId(pushId);
-            if (window.innerWidth < 1024) {
-                setIsSidebarOpen(false);
-            }
         }
     };
 
@@ -274,83 +291,101 @@ const App: React.FC = () => {
     };
 
     const currentPosts = getCurrentPush()?.posts || posts;
+    const socialEnvConfigured = Object.values(socialEnvStatus || {}).some(value => value);
+
+    useEffect(() => {
+        if (socialEnvError) {
+            showNotification(socialEnvError);
+        }
+    }, [socialEnvError]);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative">
-            {/* Header - only visible on mobile */}
-            <div className="lg:hidden">
-                <Header 
-                    tone={tone}
-                    onToneChange={setTone}
-                    onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-                />
-            </div>
-            
-            {/* Desktop: Row layout with sidebar and main content */}
-            <div className="app-layout">
-                <Sidebar 
-                    postHistory={postHistory}
-                    currentPushId={currentPushId}
-                    onLoadPush={loadPush}
-                    isOpen={isSidebarOpen}
-                    onOverlayClick={() => setIsSidebarOpen(false)}
-                />
+        <div className="min-h-screen bg-slate-950">
+            <Header
+                tone={tone}
+                onToneChange={setTone}
+                onToggleHistory={() => setIsHistoryOpen(prev => !prev)}
+                onOpenSocialSettings={() => setIsSocialModalOpen(true)}
+                socialEnvConfigured={socialEnvConfigured}
+                historyOpen={isHistoryOpen}
+            />
 
-                {/* Main Content */}
-                <main className="main-content pt-20 lg:pt-8 px-4 pb-8">
-                    {/* Desktop Header - integrated into main content */}
-                    <div className="hidden lg:block mb-8">
-                        <Header 
-                            tone={tone}
-                            onToneChange={setTone}
-                            onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-                        />
-                    </div>
-
-                    <div className="max-w-2xl mx-auto space-y-6">
-                        {currentPosts.length > 0 ? (
-                            currentPosts.map((post, index) => (
-                                <PostCard 
-                                    key={post.id}
-                                    post={post}
-                                    index={index}
-                                    isLoading={isLoading[post.id] || false}
-                                    onContentChange={async (event: React.ChangeEvent<HTMLTextAreaElement>, id: string) => {
-                                        const newContent = event.target.value;
-                                        try {
-                                            await updateContentText(id, newContent);
-                                            setPosts(prevPosts => 
-                                                prevPosts.map(p => 
-                                                    p.id === id ? { ...p, content: newContent } : p
-                                                )
-                                            );
-                                        } catch (error) {
-                                            console.error('Error updating content:', error);
-                                        }
-                                    }}
-                                    onRephrase={(id: string) => rephrasePost(id)}
-                                    onApprove={(id: string) => handleApprove(id)}
-                                    onDisapprove={(id: string) => updatePostStatus(id, 'disapproved')}
-                                    onReadAloud={(_id: string) => {
-                                        showNotification('Read aloud feature coming soon');
-                                    }}
-                                />
-                            ))
-                        ) : (
-                            <div className="text-center text-white/60 py-12">
-                                <p>No content available. Check your backend connection.</p>
-                            </div>
-                        )}
-                    </div>
-                </main>
-            </div>
-
-            {/* Notification */}
             {notification && (
-                <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+                <div className="fixed top-4 right-4 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-200 shadow-lg">
                     {notification}
                 </div>
             )}
+
+            <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 lg:flex-row">
+                <main className="flex-1 space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-lg font-semibold text-slate-100">Drafts</h2>
+                        <span className="text-xs uppercase tracking-wide text-slate-500">
+                            Connected: {backendConnected ? 'Backend' : 'Mock'}
+                        </span>
+                    </div>
+
+                    {currentPosts.length > 0 ? (
+                        currentPosts.map((post) => (
+                            <PostCard
+                                key={post.id}
+                                post={post}
+                                isLoading={isLoading[post.id] || false}
+                                onContentChange={async (event: React.ChangeEvent<HTMLTextAreaElement>, id: string) => {
+                                    const newContent = event.target.value;
+                                    try {
+                                        await updateContentText(id, newContent);
+                                        setPosts(prevPosts =>
+                                            prevPosts.map(p =>
+                                                p.id === id ? { ...p, content: newContent } : p
+                                            )
+                                        );
+                                    } catch (error) {
+                                        console.error('Error updating content:', error);
+                                    }
+                                }}
+                                onRephrase={(id: string) => rephrasePost(id)}
+                                onApprove={(id: string) => handleApprove(id)}
+                                onDisapprove={(id: string) => updatePostStatus(id, 'disapproved')}
+                                onReadAloud={(_id: string) => {
+                                    showNotification('Read aloud feature coming soon');
+                                }}
+                            />
+                        ))
+                    ) : (
+                        <div className="rounded-lg border border-slate-800 bg-slate-900 p-8 text-center text-slate-400">
+                            No content available. Check your backend connection.
+                        </div>
+                    )}
+                </main>
+
+                <aside
+                    className={`${isHistoryOpen ? 'flex' : 'hidden'} lg:flex lg:w-80`}
+                >
+                    <Sidebar
+                        postHistory={postHistory}
+                        currentPushId={currentPushId}
+                        onLoadPush={(id) => {
+                            loadPush(id);
+                            if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                                setIsHistoryOpen(false);
+                            }
+                        }}
+                        className="w-full rounded-xl border border-slate-800 bg-slate-900/60 p-4"
+                    />
+                </aside>
+            </div>
+
+            <SocialEnvModal
+                isOpen={isSocialModalOpen}
+                values={socialEnvValues}
+                onClose={() => setIsSocialModalOpen(false)}
+                onSave={handleSaveSocialEnv}
+                onClear={handleClearSocialEnv}
+                onNotify={showNotification}
+                status={socialEnvStatus}
+                isSyncing={socialEnvSyncing}
+            />
         </div>
     );
 };

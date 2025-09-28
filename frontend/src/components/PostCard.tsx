@@ -3,7 +3,6 @@ import { Post } from '../types/shared';
 
 interface PostCardProps {
     post: Post;
-    index: number;
     isLoading: boolean;
     onApprove: (id: string) => void;
     onDisapprove: (id: string) => void;
@@ -14,7 +13,6 @@ interface PostCardProps {
 
 const PostCard: React.FC<PostCardProps> = ({
     post,
-    index,
     isLoading,
     onApprove,
     onDisapprove,
@@ -22,23 +20,43 @@ const PostCard: React.FC<PostCardProps> = ({
     onReadAloud,
     onContentChange
 }) => {
-    const getPlatformGradient = (platform: string) => {
+    const getPlatformAccent = (platform: string) => {
         switch (platform) {
-            case 'LinkedIn': return 'from-blue-500 to-blue-700';
-            case 'X': return 'from-gray-800 to-black';
-            case 'Email': return 'from-green-500 to-green-700';
-            case 'TikTok': return 'from-pink-500 to-red-500';
-            default: return 'from-purple-500 to-purple-700';
+            case 'LinkedIn':
+                return { border: 'border-sky-500/40', text: 'text-sky-200' };
+            case 'X':
+                return { border: 'border-slate-500/40', text: 'text-slate-200' };
+            case 'Email':
+                return { border: 'border-emerald-500/40', text: 'text-emerald-200' };
+            case 'TikTok':
+                return { border: 'border-pink-500/40', text: 'text-pink-200' };
+            default:
+                return { border: 'border-indigo-500/40', text: 'text-indigo-200' };
         }
     };
+
+    const statusTone = () => {
+        switch (post.status) {
+            case 'approved':
+                return 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/30';
+            case 'disapproved':
+                return 'bg-rose-500/20 text-rose-200 border border-rose-500/30';
+            case 'posted':
+                return 'bg-blue-500/20 text-blue-200 border border-blue-500/30';
+            default:
+                return 'bg-slate-700/30 text-slate-200 border border-slate-600/40';
+        }
+    };
+
+    const platformAccent = getPlatformAccent(post.platform);
 
     const renderMedia = (post: Post) => {
         if (post.media.length === 0) {
             return (
-                <div className="w-full h-48 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center">
-                    <div className="text-gray-400 text-center">
-                        <div className="text-4xl mb-2">📄</div>
-                        <div className="font-medium">No Media</div>
+                <div className="flex h-48 w-full items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/70">
+                    <div className="text-center text-slate-500">
+                        <div className="mb-2 text-3xl">📄</div>
+                        <div className="text-sm font-medium">No media attached</div>
                     </div>
                 </div>
             );
@@ -94,19 +112,16 @@ const PostCard: React.FC<PostCardProps> = ({
     };
 
     return (
-        <div 
-            className="post-card-container rounded-3xl p-8 transform transition-all duration-500"
-            style={{ animationDelay: `${index * 0.1}s` }}
-        >
+        <div className="post-card-container rounded-3xl p-8">
             {/* Platform Header */}
-            <div className={`bg-gradient-to-r ${getPlatformGradient(post.platform)} rounded-2xl p-4 mb-6 text-white`}>
+            <div
+                className={`mb-6 rounded-2xl border ${platformAccent.border} bg-slate-900/70 p-4 text-slate-100`}
+            >
                 <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold">{post.platform}</h3>
-                    <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        post.status === 'approved' ? 'bg-green-500' :
-                        post.status === 'disapproved' ? 'bg-red-500' :
-                        'bg-yellow-500'
-                    }`}>
+                    <h3 className={`text-sm font-semibold uppercase tracking-wide ${platformAccent.text}`}>
+                        {post.platform}
+                    </h3>
+                    <div className={`rounded-full px-3 py-1 text-xs font-semibold ${statusTone()}`}>
                         {post.status.toUpperCase()}
                     </div>
                 </div>
@@ -135,7 +150,7 @@ const PostCard: React.FC<PostCardProps> = ({
                 value={post.content}
                 onChange={(e) => onContentChange(e, post.id)}
                 disabled={post.status !== 'pending'}
-                className="w-full h-32 rounded-2xl border-0 bg-white/20 backdrop-blur-lg p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all resize-none"
+                className="h-32 w-full resize-none rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-slate-100 placeholder-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300/40"
                 placeholder="AI-generated content..."
             />
 
@@ -144,7 +159,7 @@ const PostCard: React.FC<PostCardProps> = ({
                 <button
                     onClick={() => onRephrase(post.id)}
                     disabled={post.status !== 'pending' || isLoading}
-                    className="modern-button flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold py-3 px-4 rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="modern-button flex-1 rounded-2xl bg-indigo-600 py-3 px-4 text-sm font-semibold text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {isLoading ? (
                         <div className="loading-spinner mx-auto"></div>
@@ -155,7 +170,7 @@ const PostCard: React.FC<PostCardProps> = ({
                 <button
                     onClick={() => onReadAloud(post.id)}
                     disabled={post.status !== 'pending'}
-                    className="modern-button bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold py-3 px-6 rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="modern-button rounded-2xl bg-slate-800 py-3 px-6 text-sm font-semibold text-slate-100 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     🎧
                 </button>
@@ -166,14 +181,14 @@ const PostCard: React.FC<PostCardProps> = ({
                 <button
                     onClick={() => onApprove(post.id)}
                     disabled={post.status !== 'pending'}
-                    className="modern-button flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold py-3 px-4 rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="modern-button flex-1 rounded-2xl bg-emerald-600 py-3 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     ✅ Approve
                 </button>
                 <button
                     onClick={() => onDisapprove(post.id)}
                     disabled={post.status !== 'pending'}
-                    className="modern-button flex-1 bg-gradient-to-r from-red-500 to-pink-500 text-white font-semibold py-3 px-4 rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="modern-button flex-1 rounded-2xl bg-rose-600 py-3 px-4 text-sm font-semibold text-white transition-colors hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     ❌ Reject
                 </button>

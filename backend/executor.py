@@ -4,7 +4,6 @@ MCP Agent Executor Module
 This module provides parallel execution of AI models/MCP servers using mcp-agent
 with proper concurrent processing and result standardization.
 """
-import asyncio
 import os
 from typing import List, Dict, Optional, Union
 from dataclasses import dataclass
@@ -48,23 +47,33 @@ class MCPAgentExecutor:
 
     def __init__(self,
                  api_key: Optional[str] = None,
-                 model: str = "blackboxai/google/gemini-2.5-pro",
-                 base_url: str = "https://api.blackbox.ai/v1"):
+                 model: str = "gpt-5",
+                 base_url: Optional[str] = None,
+                 provider: Optional[str] = None,
+                 default_headers: Optional[Dict[str, str]] = None):
         """
         Initialize the MCP Agent executor
         
         Args:
-            api_key: BlackboxAI API key (or use BLACKBOX_API_KEY env var)
-            model: BlackboxAI model to use
-            base_url: BlackboxAI API base URL
+            api_key: Optional API key override for the selected provider
+            model: Default model name for the selected provider
+            base_url: API base URL for the selected provider
+            provider: LLM provider identifier (blackbox, openai, openrouter)
+            default_headers: Optional extra HTTP headers for OpenAI-compatible clients
         """
-        load_dotenv()
-        self.api_key = api_key or os.getenv("BLACKBOX_API_KEY")
-        if not self.api_key:
-            raise ValueError("BlackboxAI API key is required. Set BLACKBOX_API_KEY environment variable.")
+        load_dotenv(override=True)
+        self.provider = (provider or os.getenv("MCP_LLM_PROVIDER") or "openai").strip().lower()
+        self._provider_config = self._resolve_provider_config(
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
+            default_headers=default_headers,
+        )
 
-        self.model = model
-        self.base_url = base_url
+        self.api_key = self._provider_config["api_key"]
+        self.model = self._provider_config["model"]
+        self.base_url = self._provider_config["base_url"]
+        self.default_headers = self._provider_config.get("default_headers")
         self.app = None
 
         # Available MCP servers configuration
@@ -73,39 +82,74 @@ class MCPAgentExecutor:
                 "command": "uv",
                 "args": ["run", "python", "servers/bbai_mcp_server/blackbox_mcp_server/server.py"],
                 "cwd": str(Path(__file__).parent),
-                "env": dict(os.environ)
+                "env": {"BLACKBOX_API_KEY": os.getenv("BLACKBOX_API_KEY")}
+            },
+            "openai": {
+                "command": "uv",
+                "args": ["run", "python", "servers/openai_mcp_server/server.py"],
+                "cwd": str(Path(__file__).parent),
+                "env": {"OPENAI_API_KEY": os.getenv("OPENAI_API_KEY")}
             },
             "bluesky": {
                 "command": "uv",
                 "args": ["run", "python", "servers/bluesky-mcp-python/server.py"],
                 "cwd": str(Path(__file__).parent),
-                "env": dict(os.environ)
+                "env": {"BLUESKY_IDENTIFIER": os.getenv('BLUESKY_IDENTIFIER'),
+                        "BLUESKY_APP_PASSWORD": os.getenv('BLUESKY_APP_PASSWORD'),
+                        "BLUESKY_SERVICE_URL": os.getenv('BLUESKY_SERVICE_URL')}
             },
             "linkedin": {
                 "command": "uv",
                 "args": ["run", "python", "servers/linkedin-mcp/linkedin_mcp/server.py"],
                 "cwd": str(Path(__file__).parent),
-                "env": dict(os.environ)
+                "env": {"LINKEDIN_CLIENT_ID": os.getenv("LINKEDIN_CLIENT_ID"),
+                        "LINKEDIN_CLIENT_SECRET": os.getenv("LINKEDIN_CLIENT_SECRET"),
+                        "LINKEDIN_REDIRECT_URI": os.getenv("LINKEDIN_REDIRECT_URI")}
             },
             "twitter": {
                 "command": "uv",
                 "args": ["run", "python", "servers/twitter-mcp-python/server.py"],
                 "cwd": str(Path(__file__).parent),
-                "env": dict(os.environ)
+                "env": {"TWITTER_API_KEY": os.getenv("TWITTER_API_KEY"),
+                        "TWITTER_API_SECRET_KEY": os.getenv("TWITTER_API_SECRET_KEY"),
+                        "TWITTER_ACCESS_TOKEN": os.getenv("TWITTER_ACCESS_TOKEN"),
+                        "TWITTER_ACCESS_TOKEN_SECRET": os.getenv("TWITTER_ACCESS_TOKEN_SECRET")}
             },
             "mongodb": {
                 "command": "npx",
                 "args": ["-y", "mongodb-mcp-server", "--connectionString",
                          os.getenv("MONGODB_URI"), ],
                 "cwd": str(Path(__file__).parent),
-                "env": dict(os.environ)
+                "env": {
+                    "MONGODB_URI": os.getenv("MONGODB_URI"),
+                    "MONGODB_DB_NAME": os.getenv("MONGODB_DB_NAME")}
             }
         }
+        self._setup_mcp_app()
+
+    def update_server_env(self, env_updates: Dict[str, Optional[str]],
+                          server_names: Optional[List[str]] = None) -> None:
+        """Refresh MCP server environment variables after runtime updates."""
+        target_servers = server_names or list(self._server_config.keys())
+
+        for server_name in target_servers:
+            if server_name not in self._server_config:
+                continue
+
+            server_env = self._server_config[server_name].get("env", {})
+            for key, value in env_updates.items():
+                if value is None:
+                    server_env.pop(key, None)
+                else:
+                    server_env[key] = value
+
+        # Rebuild MCP app so new env vars propagate to subprocess configs
         self._setup_mcp_app()
 
     def _setup_mcp_app(self):
         """Setup MCP application with server configurations using Settings"""
         # Build server configurations based on requested servers
+        load_dotenv(override=True)
         mcp_servers = {}
         for server_name, config in self._server_config.items():
             mcp_servers[server_name] = MCPServerSettings(
@@ -116,19 +160,79 @@ class MCPAgentExecutor:
             )
 
         # Create settings with MCP server configurations
+        openai_settings_kwargs = dict(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            default_model=self.model,
+        )
+        if self.default_headers:
+            openai_settings_kwargs["default_headers"] = self.default_headers
+
         settings = Settings(
             execution_engine="asyncio",
             logger=LoggerSettings(type="console", level="info"),
             mcp=MCPSettings(servers=mcp_servers),
-            openai=OpenAISettings(
-                api_key=self.api_key,
-                base_url=self.base_url,
-                default_model=self.model,
-            ),
+            openai=OpenAISettings(**openai_settings_kwargs),
         )
 
         # Initialize MCP app with settings
         self.app = MCPApp(name="agent_executor", settings=settings)
+
+    def _resolve_provider_config(self,
+                                 api_key: Optional[str],
+                                 model: Optional[str],
+                                 base_url: Optional[str],
+                                 default_headers: Optional[Dict[str, str]]) -> Dict[
+        str, Optional[Union[str, Dict[str, str]]]]:
+        """Derive OpenAI-compatible client configuration for the selected provider."""
+        provider = self.provider
+        if provider == "blackbox":
+            resolved_api_key = api_key or os.getenv("BLACKBOX_API_KEY")
+            resolved_base_url = base_url or os.getenv("BLACKBOX_BASE_URL", "https://api.blackbox.ai/v1")
+            resolved_model = model or os.getenv("BLACKBOX_DEFAULT_MODEL", "blackboxai/google/gemini-2.5-pro")
+            resolved_headers = default_headers
+            key_hint = "BLACKBOX_API_KEY"
+        elif provider == "openai":
+            resolved_api_key = api_key or os.getenv("OPENAI_API_KEY")
+            resolved_base_url = base_url or os.getenv("OPENAI_BASE_URL")
+            resolved_model = model or os.getenv("OPENAI_DEFAULT_MODEL", "gpt-4o")
+            resolved_headers = default_headers
+            key_hint = "OPENAI_API_KEY"
+        elif provider == "openrouter":
+            resolved_api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+            resolved_base_url = base_url or os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+            resolved_model = model or os.getenv("OPENROUTER_DEFAULT_MODEL", "openrouter/google/gemini-flash-1.5")
+            resolved_headers = self._build_openrouter_headers(default_headers)
+            key_hint = "OPENROUTER_API_KEY"
+        else:
+            raise ValueError(
+                f"Unsupported LLM provider '{provider}'. Supported providers are 'blackbox', 'openai', and 'openrouter'."
+            )
+
+        if not resolved_api_key:
+            raise ValueError(
+                f"API key is required for provider '{provider}'. Set the {key_hint} environment variable or pass api_key explicitly."
+            )
+
+        return {
+            "api_key": resolved_api_key,
+            "model": resolved_model,
+            "base_url": resolved_base_url,
+            "default_headers": resolved_headers,
+        }
+
+    def _build_openrouter_headers(self, base_headers: Optional[Dict[str, str]]) -> Optional[Dict[str, str]]:
+        """Compose OpenRouter default headers from env overrides without clobbering explicit values."""
+        headers = dict(base_headers) if base_headers else {}
+        referer = os.getenv("OPENROUTER_HTTP_REFERER")
+        title = os.getenv("OPENROUTER_X_TITLE")
+
+        if referer:
+            headers.setdefault("HTTP-Referer", referer)
+        if title:
+            headers.setdefault("X-Title", title)
+
+        return headers or None
 
     async def _create_agent(self, server_names: List[str], app_context):
         """Create agent with access to specified servers following precise pattern from llm_agent.py"""
@@ -238,6 +342,8 @@ class MCPAgentExecutor:
 # Global executor instance
 _executor = None
 
+SOCIAL_SERVER_NAMES = ["twitter", "bluesky", "linkedin"]
+
 
 def get_executor() -> MCPAgentExecutor:
     """Get or create the global MCP agent executor instance"""
@@ -245,6 +351,21 @@ def get_executor() -> MCPAgentExecutor:
     if _executor is None:
         _executor = MCPAgentExecutor()
     return _executor
+
+
+def update_mcp_server_env(env_updates: Dict[str, Optional[str]], server_names: Optional[List[str]] = None) -> None:
+    """Update environment variables for MCP servers and refresh executor configuration."""
+    target_servers = server_names or SOCIAL_SERVER_NAMES
+
+    # Apply updates to process environment first so future executor instances inherit them
+    for key, value in env_updates.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
+
+    if _executor is not None:
+        _executor.update_server_env(env_updates, target_servers)
 
 
 async def execute_mcp_client(
