@@ -49,21 +49,13 @@ class TextRequest(BaseModel):
 class ImageRequest(BaseModel):
     prompt: str
     model: Optional[str] = None
-    n: int = Field(default=1, ge=1, le=10)
-    size: Optional[str] = None
     response_format: Optional[str] = None
     user: Optional[str] = None
 
     def to_payload(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {"prompt": self.prompt, "n": self.n}
+        payload: Dict[str, Any] = {"prompt": self.prompt}
         if self.model:
             payload["model"] = self.model
-        if self.size:
-            payload["size"] = self.size
-        if self.response_format:
-            payload["response_format"] = self.response_format
-        if self.user:
-            payload["user"] = self.user
         return payload
 
 
@@ -71,9 +63,6 @@ class AudioRequest(BaseModel):
     input: str
     model: str
     voice: str
-    response_format: Optional[str] = None
-    speed: Optional[float] = Field(default=None, ge=0.25, le=4.0)
-    instructions: Optional[str] = None
 
     def to_payload(self) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
@@ -81,12 +70,6 @@ class AudioRequest(BaseModel):
             "model": self.model,
             "voice": self.voice,
         }
-        if self.response_format:
-            payload["response_format"] = self.response_format
-        if self.speed is not None:
-            payload["speed"] = self.speed
-        if self.instructions:
-            payload["instructions"] = self.instructions
         return payload
 
 
@@ -114,7 +97,7 @@ class OpenAIClient:
 
     async def generate_image(self, request: ImageRequest) -> Dict[str, Any]:
         try:
-            response = await self.client.post("/images/generations", json=request.to_payload())
+            response = await self.client.post("/images/generations", json=request.to_payload(), timeout=90)
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as exc:
@@ -124,7 +107,7 @@ class OpenAIClient:
 
     async def generate_speech(self, request: AudioRequest) -> Dict[str, Any]:
         try:
-            response = await self.client.post("/audio/speech", json=request.to_payload())
+            response = await self.client.post("/audio/speech", json=request.to_payload(), timeout=90)
             response.raise_for_status()
             audio_bytes = response.content
             b64_audio = base64.b64encode(audio_bytes).decode("ascii")

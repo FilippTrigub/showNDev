@@ -47,10 +47,6 @@ class ImageTools:
     async def generate_image(
         prompt: str,
         model: Optional[str] = None,
-        n: int = 1,
-        size: Optional[str] = None,
-        response_format: Optional[str] = None,
-        user: Optional[str] = None,
     ) -> Dict[str, Any]:
         if not prompt:
             raise ValueError("Image prompt must not be empty")
@@ -58,10 +54,7 @@ class ImageTools:
         request = ImageRequest(
             prompt=prompt,
             model=model,
-            n=n,
-            size=size,
-            response_format=response_format,
-            user=user,
+            response_format="url",
         )
         return await client.generate_image(request)
 
@@ -72,9 +65,6 @@ class AudioTools:
         text: str,
         model: str,
         voice: str,
-        response_format: Optional[str] = None,
-        speed: Optional[float] = None,
-        instructions: Optional[str] = None,
     ) -> Dict[str, Any]:
         if not text:
             raise ValueError("Input text for speech synthesis must not be empty")
@@ -83,9 +73,6 @@ class AudioTools:
             input=text,
             model=model,
             voice=voice,
-            response_format=response_format,
-            speed=speed,
-            instructions=instructions,
         )
         return await client.generate_speech(request)
 

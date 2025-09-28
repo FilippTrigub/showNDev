@@ -107,13 +107,13 @@ class MCPAgentExecutor:
                         "LINKEDIN_REDIRECT_URI": os.getenv("LINKEDIN_REDIRECT_URI")}
             },
             "twitter": {
-                "command": "uv",
-                "args": ["run", "python", "servers/twitter-mcp-python/server.py"],
+                "command": "node",
+                "args": ["servers/twitter-mcp/build/index.js"],
                 "cwd": str(Path(__file__).parent),
-                "env": {"TWITTER_API_KEY": os.getenv("TWITTER_API_KEY"),
-                        "TWITTER_API_SECRET_KEY": os.getenv("TWITTER_API_SECRET_KEY"),
-                        "TWITTER_ACCESS_TOKEN": os.getenv("TWITTER_ACCESS_TOKEN"),
-                        "TWITTER_ACCESS_TOKEN_SECRET": os.getenv("TWITTER_ACCESS_TOKEN_SECRET")}
+                "env": {"API_KEY": os.getenv("API_KEY"),
+                        "API_SECRET_KEY": os.getenv("API_SECRET_KEY"),
+                        "ACCESS_TOKEN": os.getenv("ACCESS_TOKEN"),
+                        "ACCESS_TOKEN_SECRET": os.getenv("ACCESS_TOKEN_SECRET")}
             },
             "mongodb": {
                 "command": "npx",

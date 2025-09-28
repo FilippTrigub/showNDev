@@ -20,7 +20,7 @@ prompts:
       image_content: List[str]
       video_content: List[str]
       audio_content: List[str]
-    server: "blackbox"
+    server: "openai"
 
   - name: "email_notification"
     content: |
@@ -39,7 +39,7 @@ prompts:
       image_content: List[str]
       video_content: List[str]
       audio_content: List[str]
-    server: "blackbox"
+    server: "openai"
 
   - name: "linkedin_post"
     content: |
@@ -58,7 +58,7 @@ prompts:
       image_content: List[str]
       video_content: List[str]
       audio_content: List[str]
-    server: "blackbox"
+    server: "openai"
 
   - name: "tweet_update"
     content: |
@@ -77,4 +77,4 @@ prompts:
       image_content: List[str]
       video_content: List[str]
       audio_content: List[str]
-    server: "blackbox"
+    server: "openai"

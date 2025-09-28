@@ -42,20 +42,12 @@ async def openai_chat(
 async def openai_image(
     prompt: str,
     model: Optional[str] = None,
-    n: int = 1,
-    size: Optional[str] = None,
-    response_format: Optional[str] = None,
-    user: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Generate one or more images through OpenAI's image generation endpoint."""
 
     return await ImageTools.generate_image(
         prompt=prompt,
         model=model,
-        n=n,
-        size=size,
-        response_format=response_format,
-        user=user,
     )
 
 
@@ -64,9 +56,6 @@ async def openai_speech(
     text: str,
     model: str,
     voice: str,
-    response_format: Optional[str] = None,
-    speed: Optional[float] = None,
-    instructions: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Synthesize speech audio from text using OpenAI's text-to-speech models."""
 
@@ -74,9 +63,6 @@ async def openai_speech(
         text=text,
         model=model,
         voice=voice,
-        response_format=response_format,
-        speed=speed,
-        instructions=instructions,
     )
 
 

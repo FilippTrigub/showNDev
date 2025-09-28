@@ -107,7 +107,7 @@ async def main():
             logger.warning(f"Could not initialize Bluesky client: {str(e)} - will attempt on first request")
         
         # Run the server with stdio transport (for fast-agent compatibility)
-        await mcp.run(transport="stdio")
+        mcp.run(transport="stdio")
         
     except Exception as e:
         logger.error(f"Failed to start server: {e}")
