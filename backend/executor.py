@@ -91,8 +91,8 @@ class MCPAgentExecutor:
                 "env": {"OPENAI_API_KEY": os.getenv("OPENAI_API_KEY")}
             },
             "bluesky": {
-                "command": "uv",
-                "args": ["run", "python", "servers/bluesky-mcp-python/server.py"],
+                "command": "node",
+                "args": ["servers/bsky_mcp_server/build/src/index.js"],
                 "cwd": str(Path(__file__).parent),
                 "env": {"BLUESKY_IDENTIFIER": os.getenv('BLUESKY_IDENTIFIER'),
                         "BLUESKY_APP_PASSWORD": os.getenv('BLUESKY_APP_PASSWORD'),

@@ -11,7 +11,7 @@ class Config:
         load_dotenv()
         self.api_key = self._get_api_key()
         self.base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-        timeout_env = os.getenv("OPENAI_TIMEOUT", "60")
+        timeout_env = os.getenv("OPENAI_TIMEOUT", "120")
         try:
             self.timeout = float(timeout_env)
         except ValueError:

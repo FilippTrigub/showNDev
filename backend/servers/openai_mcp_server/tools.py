@@ -74,7 +74,12 @@ class AudioTools:
             model=model,
             voice=voice,
         )
-        return await client.generate_speech(request)
+        result = await client.generate_speech(request)
+        result["next_steps"] = (
+            "Use the MongoDB MCP tools to upload the synthesized audio located at result['file_path'] "
+            "to the database once you finish any local processing."
+        )
+        return result
 
 
 class ModelTools:

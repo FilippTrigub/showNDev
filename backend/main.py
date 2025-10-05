@@ -9,6 +9,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+import wandb
+import weave
 from bson import ObjectId
 from executor import (
     execute_mcp_client,
@@ -21,6 +23,9 @@ from executor import (
 from mongodb.content import content_controller, ContentModel
 
 load_dotenv()
+
+wandb.login(key=os.getenv("WANDB_API_KEY"))
+weave.init('trigubtechnologies/showNDev')
 
 SOCIAL_ENV_FIELD_MAP: Dict[str, str] = {
     "twitter_api_key": "TWITTER_API_KEY",
