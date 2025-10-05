@@ -57,7 +57,7 @@ async def openai_speech(
     model: str,
     voice: str,
 ) -> Dict[str, Any]:
-    """Synthesize speech audio from text using OpenAI's text-to-speech models."""
+    """Synthesize speech audio to a temp file; follow up with MongoDB MCP tools to store it."""
 
     return await AudioTools.generate_speech(
         text=text,

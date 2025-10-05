@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-import base64
+import tempfile
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
 import httpx
 from pydantic import BaseModel, Field
@@ -110,12 +112,14 @@ class OpenAIClient:
             response = await self.client.post("/audio/speech", json=request.to_payload(), timeout=90)
             response.raise_for_status()
             audio_bytes = response.content
-            b64_audio = base64.b64encode(audio_bytes).decode("ascii")
+            content_type = response.headers.get("content-type", "audio/mpeg")
+            temp_path = self._persist_audio(audio_bytes, content_type)
             return {
-                "audio_base64": b64_audio,
-                "format": request.response_format or "mp3",
-                "content_type": response.headers.get("content-type", "audio/mpeg"),
+                "file_path": str(temp_path),
+                "format": temp_path.suffix.lstrip("."),
+                "content_type": content_type,
                 "size_bytes": len(audio_bytes),
+                "storage": "local_temp",
             }
         except httpx.HTTPStatusError as exc:
             raise Exception(self._format_error(exc)) from exc
@@ -151,6 +155,32 @@ class OpenAIClient:
             "OpenAI API request failed: "
             f"{exc.response.status_code} - {detail}"
         )
+
+    @staticmethod
+    def _persist_audio(audio_bytes: bytes, content_type: str) -> Path:
+        try:
+            temp_dir = Path(tempfile.gettempdir()) / "openai_mcp_audio"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            suffix = OpenAIClient._extension_for_content_type(content_type)
+            temp_path = temp_dir / f"openai_speech_{uuid4().hex}{suffix}"
+            temp_path.write_bytes(audio_bytes)
+            return temp_path
+        except OSError as exc:
+            raise Exception(f"Failed to persist audio to temp storage: {exc}") from exc
+
+    @staticmethod
+    def _extension_for_content_type(content_type: str) -> str:
+        mapping = {
+            "audio/mpeg": ".mp3",
+            "audio/mp3": ".mp3",
+            "audio/wav": ".wav",
+            "audio/x-wav": ".wav",
+            "audio/ogg": ".ogg",
+            "audio/webm": ".webm",
+            "audio/flac": ".flac",
+        }
+        normalized = (content_type or "").split(";")[0].lower()
+        return mapping.get(normalized, ".bin")
 
 
 client = OpenAIClient()

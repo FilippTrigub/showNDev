@@ -7,7 +7,7 @@ You will use two inputs:
 
 Priorities: 
 			(1) accuracy
-			2) clarity for non-experts
+			(2) clarity for non-experts
 			(3) light, inclusive humor
 			(4) clean structure
 			(5) JSON output only
