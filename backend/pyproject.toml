@@ -26,4 +26,5 @@ dependencies = [
     "motor>=3.7.1",
     "rich>=14.1.0",
     "pytest-asyncio>=1.2.0",
+    "weave>=0.52.9",
 ]

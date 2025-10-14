@@ -21,6 +21,8 @@ from executor import (
     validate_server_by_platform,
 )
 from mongodb.content import content_controller, ContentModel
+from src.twitter_client import TwitterClient
+from src.bluesky_client import BlueskyClient
 
 load_dotenv()
 
@@ -400,97 +402,183 @@ async def rephrase_content(content_id: str, request: RephraseRequest):
 
 @app.post("/content/{content_id}/approve", response_model=ContentResponse)
 async def approve_and_post_content(content_id: str):
-    """Approve content and post to social media using MCP client executor"""
+    """Approve content and post to social media using direct clients for Twitter/Bluesky"""
 
     content = await content_controller.get_by_id(content_id)
+    platform = content.platform.lower()
 
-    server_valid = validate_server_by_platform(content.platform)
-    if not server_valid:
-        raise HTTPException(500, "invalid server")
+    # Handle Twitter/X using direct Twitter client
+    if platform in ["twitter", "x"]:
+        try:
+            # Get Twitter credentials from environment
+            api_key = os.getenv("TWITTER_API_KEY")
+            api_secret = os.getenv("TWITTER_API_SECRET")
+            access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+            access_token_secret = os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
 
-    # Create posting prompt for social media platforms
-    posting_prompt = f"""
-    Post this approved content to social media platforms:
-    
-    Content: {content.content}
-    
-    Please format appropriately for each platform and return confirmation of posting.
-    """
+            if not all([api_key, api_secret, access_token, access_token_secret]):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Twitter credentials not configured. Please set TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, and TWITTER_ACCESS_TOKEN_SECRET"
+                )
 
-    # Use platform-specific MCP servers for actual social media posting
-    platform_server_map = {
-        "linkedin": "linkedin",
-        "twitter": "twitter",
-        "x": "twitter",  # Twitter/X mapping
-        "bluesky": "bluesky"
-    }
+            # Initialize Twitter client
+            twitter_client = TwitterClient(
+                api_key=api_key,
+                api_secret=api_secret,
+                access_token=access_token,
+                access_token_secret=access_token_secret
+            )
 
-    target_server = platform_server_map.get(content.platform.lower(), "blackbox")
+            # Post to Twitter
+            result = await twitter_client.post_tweet(content.content)
 
-    try:
-        # First generate optimized content using BlackBox
-        content_generation_prompt = f"""
-        Optimize this content for {content.platform} posting:
-        
-        {content.content}
-        
-        Create a {content.platform}-appropriate version that maintains the core message while following platform best practices for engagement, character limits, and formatting.
-        """
+            if result["success"]:
+                # Update content status and store Twitter metadata
+                await content_controller.update_by_id(content_id, {
+                    "status": "posted",
+                    "twitter_id": result["id"],
+                    "twitter_url": result["url"],
+                    "posted_at": result["created_at"]
+                })
 
-        generation_results = await execute_mcp_client(
-            prompt=content_generation_prompt,
-            server_names=["blackbox"],
-            prompt_name="optimize_content_for_platform"
-        )
+                return ContentResponse(
+                    id=content_id,
+                    content=f"✅ Posted to Twitter: {content.content}",
+                    status="posted",
+                    message=f"Successfully posted to Twitter! URL: {result['url']}"
+                )
+            else:
+                error_msg = result.get("error", "Unknown error")
+                raise HTTPException(status_code=500, detail=f"Failed to post to Twitter: {error_msg}")
 
-        optimized_content = content.content
-        for result in generation_results:
-            if result.content and result.status in ["generated"]:
-                optimized_content = result.content.strip()
-                break
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Twitter posting error: {str(e)}")
 
-        # Now actually post using platform-specific server
-        posting_results = await execute_mcp_client(
-            prompt=f"Post this content to {content.platform}: {optimized_content}",
-            server_names=[target_server],
-            prompt_name="actual_platform_post"
-        )
+    # Handle Bluesky using direct Bluesky client
+    elif platform == "bluesky":
+        try:
+            # Get Bluesky credentials from environment
+            identifier = os.getenv("BLUESKY_IDENTIFIER")
+            password = os.getenv("BLUESKY_APP_PASSWORD")
+            service_url = os.getenv("BLUESKY_SERVICE_URL", "https://bsky.social")
 
-        # Check if actual posting succeeded
-        result = posting_results[0]
-        if result.content and result.status in ["generated", "posted", "success"]:
-            # Update content status to "posted" in MongoDB
+            if not identifier or not password:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Bluesky credentials not configured. Please set BLUESKY_IDENTIFIER and BLUESKY_APP_PASSWORD"
+                )
+
+            # Initialize Bluesky client
+            bluesky_client = BlueskyClient(
+                identifier=identifier,
+                password=password,
+                service_url=service_url
+            )
+
+            # Login to Bluesky
+            if not await bluesky_client.login():
+                raise HTTPException(status_code=401, detail="Failed to login to Bluesky")
+
+            # Post to Bluesky
+            result = await bluesky_client.create_post(content.content)
+
+            if result["success"]:
+                # Update content status and store Bluesky metadata
+                await content_controller.update_by_id(content_id, {
+                    "status": "posted",
+                    "bluesky_uri": result["uri"],
+                    "bluesky_cid": result["cid"],
+                    "posted_at": result["created_at"]
+                })
+
+                return ContentResponse(
+                    id=content_id,
+                    content=f"✅ Posted to Bluesky: {content.content}",
+                    status="posted",
+                    message=f"Successfully posted to Bluesky! URI: {result['uri']}"
+                )
+            else:
+                error_msg = result.get("error", "Unknown error")
+                raise HTTPException(status_code=500, detail=f"Failed to post to Bluesky: {error_msg}")
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Bluesky posting error: {str(e)}")
+
+    # Handle LinkedIn and other platforms using MCP executor (fallback)
+    else:
+        server_valid = validate_server_by_platform(content.platform)
+        if not server_valid:
+            raise HTTPException(500, "invalid server")
+
+        platform_server_map = {
+            "linkedin": "linkedin",
+        }
+
+        target_server = platform_server_map.get(platform, "blackbox")
+
+        try:
+            # Generate optimized content using BlackBox
+            content_generation_prompt = f"""
+            Optimize this content for {content.platform} posting:
+
+            {content.content}
+
+            Create a {content.platform}-appropriate version that maintains the core message while following platform best practices for engagement, character limits, and formatting.
+            """
+
+            generation_results = await execute_mcp_client(
+                prompt=content_generation_prompt,
+                server_names=["blackbox"],
+                prompt_name="optimize_content_for_platform"
+            )
+
+            optimized_content = content.content
+            for result in generation_results:
+                if result.content and result.status in ["generated"]:
+                    optimized_content = result.content.strip()
+                    break
+
+            # Post using platform-specific server
+            posting_results = await execute_mcp_client(
+                prompt=f"Post this content to {content.platform}: {optimized_content}",
+                server_names=[target_server],
+                prompt_name="actual_platform_post"
+            )
+
+            # Check if posting succeeded
+            result = posting_results[0]
+            if result.content and result.status in ["generated", "posted", "success"]:
+                await content_controller.update_by_id(content_id, {"status": "posted"})
+
+                return ContentResponse(
+                    id=content_id,
+                    content=f"✅ POSTED to {content.platform}: {optimized_content}",
+                    status="posted",
+                    message=f"Content successfully posted to {content.platform}!"
+                )
+            else:
+                return ContentResponse(
+                    id=content_id,
+                    content=f"NOT POSTED",
+                    status="error",
+                    message=f"Content not posted to {content.platform}!"
+                )
+
+        except Exception as platform_error:
+            print(f"Platform posting error: {platform_error}")
             await content_controller.update_by_id(content_id, {"status": "posted"})
 
             return ContentResponse(
                 id=content_id,
-                content=f"✅ ACTUALLY POSTED to {content.platform}: {optimized_content}",
+                content=f"✅ SIMULATED POST to {content.platform}: Content approved",
                 status="posted",
-                message=f"Content successfully posted to {content.platform}!"
+                message=f"Content approved! (Simulated posting to {content.platform})"
             )
-
-        else:
-            return ContentResponse(
-                id=content_id,
-                content=f"NOT POSTED",
-                status="error",
-                message=f"Content not posted to {content.platform}!"
-            )
-
-
-    except Exception as platform_error:
-        # If BlackBox server fails, simulate posting for development
-        print(f"BlackBox server not available, simulating post: {platform_error}")
-
-        # Update content status to "posted" in MongoDB
-        await content_controller.update_by_id(content_id, {"status": "posted"})
-
-        return ContentResponse(
-            id=content_id,
-            content=f"✅ SIMULATED POST to {content.platform}: Content approved and would be posted to {content.platform}",
-            status="posted",
-            message=f"Content approved! (Simulated posting to {content.platform} - real credentials needed for actual posting)"
-        )
 
 
 @app.get("/content")

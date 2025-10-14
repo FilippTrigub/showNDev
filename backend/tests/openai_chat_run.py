@@ -21,8 +21,12 @@ async def run() -> None:
     os.environ.setdefault("MCP_LLM_PROVIDER", "openai")
 
     prompt = (
-        "Use the openai_chat tool to craft a single release-note sentence announcing the new analytics dashboard. "
-        "Return only the sentence and ensure it includes the exact phrase 'analytics dashboard'."
+        "Use the openai_chat tool with model 'gpt-4o-mini' to craft a single release-note sentence announcing "
+        "the new analytics dashboard. Include messages with role 'user' asking for the sentence. "
+        "Also provide repository='test-repo', commit_sha='abc123', branch='main', "
+        "summary='Test text generation', and persist_to_db=True. After the tool call, verify the response "
+        "contains a 'content_id' field and 'text' field, then report both the MongoDB document ID and the "
+        "generated sentence."
     )
 
     results = await execute_mcp_client(prompt, ["openai"], prompt_name="openai_chat_sentence")
@@ -34,6 +38,16 @@ async def run() -> None:
             print("Response:\n" + result.content)
         if result.error:
             print("Error:\n" + result.error)
+
+        # Expected response format from updated tool:
+        # {
+        #     "content_id": "507f1f77bcf86cd799439013",
+        #     "text": "Introducing our new analytics dashboard...",
+        #     "model": "gpt-4o-mini",
+        #     "storage": "mongodb",
+        #     "message_count": 1,
+        #     "response_length": 89
+        # }
 
 
 if __name__ == "__main__":
