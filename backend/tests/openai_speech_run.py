@@ -23,7 +23,9 @@ async def run() -> None:
 
     prompt = (
         "Invoke the openai_speech tool to synthesize the sentence 'Build pipeline completed successfully.' using "
-        "model 'gpt-4o-mini-tts'. After the tool call, reply with the tool output."
+        "model 'gpt-4o-mini-tts' and voice 'alloy'. Provide repository='test-repo', commit_sha='abc123', "
+        "branch='main', and summary='Test audio generation'. After the tool call, verify the response contains "
+        "a 'content_id' field and report the MongoDB document ID."
     )
 
     results = await execute_mcp_client(prompt, ["openai"], prompt_name="openai_speech_mp3")
@@ -34,6 +36,18 @@ async def run() -> None:
         print("Response:\n" + result.content)
         if result.error:
             print("Error:\n" + result.error)
+
+        # Expected response format from updated tool:
+        # {
+        #     "content_id": "507f1f77bcf86cd799439011",
+        #     "format": "mp3",
+        #     "content_type": "audio/mpeg",
+        #     "size_bytes": 12345,
+        #     "storage": "mongodb",
+        #     "original_text": "Build pipeline completed successfully.",
+        #     "model": "gpt-4o-mini-tts",
+        #     "voice": "alloy"
+        # }
 
 
 if __name__ == "__main__":

@@ -24,8 +24,13 @@ async def openai_chat(
     max_output_tokens: Optional[int] = None,
     instructions: Optional[str] = None,
     stream: bool = False,
-) -> str:
-    """Generate text using OpenAI's Responses API."""
+    repository: Optional[str] = None,
+    commit_sha: Optional[str] = None,
+    branch: Optional[str] = None,
+    summary: Optional[str] = None,
+    persist_to_db: bool = True,
+) -> Dict[str, Any]:
+    """Generate text using OpenAI's Responses API and automatically persist to MongoDB. Returns MongoDB document ID and generated text."""
 
     return await TextTools.generate_text(
         model=model,
@@ -35,6 +40,11 @@ async def openai_chat(
         max_output_tokens=max_output_tokens,
         instructions=instructions,
         stream=stream,
+        repository=repository or "unknown",
+        commit_sha=commit_sha or "unknown",
+        branch=branch or "unknown",
+        summary=summary or "Text content generated via OpenAI",
+        persist_to_db=persist_to_db,
     )
 
 
@@ -42,12 +52,20 @@ async def openai_chat(
 async def openai_image(
     prompt: str,
     model: Optional[str] = None,
+    repository: Optional[str] = None,
+    commit_sha: Optional[str] = None,
+    branch: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Generate one or more images through OpenAI's image generation endpoint."""
+    """Generate one or more images through OpenAI's image generation endpoint and automatically persist to MongoDB. Returns MongoDB document ID and image URLs."""
 
     return await ImageTools.generate_image(
         prompt=prompt,
         model=model,
+        repository=repository or "unknown",
+        commit_sha=commit_sha or "unknown",
+        branch=branch or "unknown",
+        summary=summary or "Image content generated via OpenAI",
     )
 
 
@@ -56,13 +74,21 @@ async def openai_speech(
     text: str,
     model: str,
     voice: str,
+    repository: Optional[str] = None,
+    commit_sha: Optional[str] = None,
+    branch: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Synthesize speech audio to a temp file; follow up with MongoDB MCP tools to store it."""
+    """Synthesize speech audio and automatically persist it to MongoDB. Returns MongoDB document ID and metadata."""
 
     return await AudioTools.generate_speech(
         text=text,
         model=model,
         voice=voice,
+        repository=repository or "unknown",
+        commit_sha=commit_sha or "unknown",
+        branch=branch or "unknown",
+        summary=summary or "Audio content generated via OpenAI TTS",
     )
 
 
@@ -83,6 +109,7 @@ async def test_connection() -> Dict[str, Any]:
             messages=[{"role": "user", "content": "Reply with OK"}],
             max_output_tokens=8,
             temperature=0.0,
+            persist_to_db=False,  # Don't persist test messages
         )
         return {
             "status": "success",

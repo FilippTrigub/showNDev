@@ -22,8 +22,11 @@ async def run() -> None:
     os.environ.setdefault("MCP_LLM_PROVIDER", "openai")
 
     prompt = (
-        "Call the openai_image tool with prompt 'Minimal line icon representing CI success'. "
-        "After you receive the tool result, reply with the tool output."
+        "Call the openai_image tool with prompt 'Minimal line icon representing CI success', "
+        "model 'dall-e-3', repository='test-repo', commit_sha='abc123', branch='main', "
+        "and summary='Test image generation'. After you receive the tool result, verify the response "
+        "contains a 'content_id' field and 'image_urls' array, then report the MongoDB document ID "
+        "and image URL(s)."
     )
 
     results = await execute_mcp_client(prompt, ["openai"], prompt_name="openai_image_icon")
@@ -34,6 +37,16 @@ async def run() -> None:
         print("Response:\n" + result.content)
         if result.error:
             print("Error:\n" + result.error)
+
+        # Expected response format from updated tool:
+        # {
+        #     "content_id": "507f1f77bcf86cd799439012",
+        #     "image_urls": ["https://..."],
+        #     "prompt": "Minimal line icon representing CI success",
+        #     "model": "dall-e-3",
+        #     "storage": "mongodb",
+        #     "image_count": 1
+        # }
 
 
 if __name__ == "__main__":
