@@ -13,7 +13,7 @@ export const useNotification = () => {
         setShowMessage(true);
         messageTimeoutRef.current = setTimeout(() => {
             setShowMessage(false);
-        }, 3000);
+        }, 8002);
     };
 
     return {

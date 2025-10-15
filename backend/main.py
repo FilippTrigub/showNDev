@@ -350,7 +350,7 @@ async def rephrase_content(content_id: str, request: RephraseRequest):
                 # Update the content in MongoDB while preserving the original ID and all metadata
                 update_data = {
                     "content": result.content.strip(),
-                    "status": "rephrased",
+                    "status": "pending",  # Reset to pending after rephrasing
                     # Preserve all original metadata while updating content
                     "original_content": original_content,  # Keep a backup of original
                     "rephrase_instructions": request.instructions,
@@ -362,7 +362,7 @@ async def rephrase_content(content_id: str, request: RephraseRequest):
                 return ContentResponse(
                     id=content_id,
                     content=result.content.strip(),
-                    status="rephrased",
+                    status="pending",
                     message="Content successfully rephrased using BlackBox AI!"
                 )
 
@@ -377,7 +377,7 @@ async def rephrase_content(content_id: str, request: RephraseRequest):
             # Update with fallback result
             update_data = {
                 "content": fallback_result.content.strip(),
-                "status": "rephrased",
+                "status": "pending",  # Reset to pending after rephrasing
                 "original_content": original_content,
                 "rephrase_instructions": request.instructions,
                 "rephrased_at": content_item.timestamp,
@@ -389,7 +389,7 @@ async def rephrase_content(content_id: str, request: RephraseRequest):
             return ContentResponse(
                 id=content_id,
                 content=fallback_result.content.strip(),
-                status="rephrased",
+                status="pending",
                 message=f"Content successfully rephrased using {fallback_result.server_name}!"
             )
 
@@ -670,6 +670,32 @@ async def update_content_text(content_id: str, request: UpdateContentRequest):
     except Exception as e:
         print(f"Error updating content: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update content: {str(e)}")
+
+
+@app.get("/content/{content_id}/audio")
+async def get_content_audio(content_id: str):
+    """Get audio content stored in database for a specific content item"""
+    try:
+        # Get content from MongoDB
+        content = await content_controller.get_by_id(content_id, raise_if_none=True)
+
+        # Return all audio items from the database
+        if content.audio_content and len(content.audio_content) > 0:
+            return {
+                "audio_items": content.audio_content,
+                "count": len(content.audio_content),
+                "format": "mp3",
+                "content_type": "audio/mpeg"
+            }
+        else:
+            return {
+                "audio_items": [],
+                "count": 0,
+                "message": "No audio content available"
+            }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch audio: {str(e)}")
 
 
 @app.get("/health")

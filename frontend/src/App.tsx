@@ -9,22 +9,65 @@ import { Post, PushHistory } from './types/shared';
 import { useSocialEnv } from './hooks/useSocialEnv';
 
 // Convert ContentItem to Post format for UI compatibility
-const convertContentItemToPost = (item: ContentItem): Post => ({
-    id: item._id,
-    platform: (item.platform as 'LinkedIn' | 'X' | 'Email' | 'TikTok') || 'LinkedIn',
-    author: item.author || { 
-        name: 'System', 
-        avatar: 'https://placehold.co/100x100/667eea/ffffff?text=SYS' 
-    },
-    content: item.content || '',
-    status: item.status === 'pending' ? 'pending' : 
-           item.status === 'rephrased' ? 'pending' : 
-           item.status === 'rejected' ? 'disapproved' : 'posted',
-    media: item.media || [],
-    repository: item.repository,
-    commit_sha: item.commit_sha,
-    branch: item.branch
-});
+const convertContentItemToPost = (item: ContentItem): Post => {
+    // Build media array from separate image/video/audio arrays
+    const media: Post['media'] = [];
+
+    // Add images from image_content array
+    if (item.image_content && Array.isArray(item.image_content)) {
+        item.image_content.forEach((url: string) => {
+            if (url) {
+                media.push({ url, type: 'image' });
+            }
+        });
+    }
+
+    // Add videos from video_content array
+    if (item.video_content && Array.isArray(item.video_content)) {
+        item.video_content.forEach((url: string) => {
+            if (url) {
+                media.push({ url, type: 'video' });
+            }
+        });
+    }
+
+    // Add audio from audio_content array (base64 encoded)
+    if (item.audio_content && Array.isArray(item.audio_content)) {
+        item.audio_content.forEach((base64Audio: string, index: number) => {
+            if (base64Audio) {
+                // Create a data URL for the audio
+                const audioDataUrl = `data:audio/mpeg;base64,${base64Audio}`;
+                media.push({
+                    url: audioDataUrl,
+                    type: 'audio',
+                    caption: `Audio ${index + 1}`
+                });
+            }
+        });
+    }
+
+    // Fallback to legacy media field if present
+    if ((!media || media.length === 0) && item.media && Array.isArray(item.media)) {
+        media.push(...item.media);
+    }
+
+    return {
+        id: item._id,
+        platform: (item.platform as 'LinkedIn' | 'X' | 'Email' | 'TikTok') || 'LinkedIn',
+        author: item.author || {
+            name: 'System',
+            avatar: 'https://placehold.co/100x100/667eea/ffffff?text=SYS'
+        },
+        content: item.content || '',
+        status: item.status === 'pending' ? 'pending' :
+               item.status === 'rephrased' ? 'pending' :
+               item.status === 'rejected' ? 'disapproved' : 'posted',
+        media,
+        repository: item.repository,
+        commit_sha: item.commit_sha,
+        branch: item.branch
+    };
+};
 
 const App: React.FC = () => {
     const [posts, setPosts] = useState<Post[]>([]);
@@ -158,7 +201,7 @@ const App: React.FC = () => {
         setNotification(msg);
         messageTimeoutRef.current = window.setTimeout(() => {
             setNotification('');
-        }, 3000);
+        }, 8002);
     };
 
     const handleSaveSocialEnv = async (nextValues: typeof socialEnvValues) => {
@@ -261,30 +304,31 @@ const App: React.FC = () => {
         try {
             // Use approveAndPost API instead of just status update
             await approveAndPost(postId);
-            
+
             // Update local state to "posted" status
-            setPosts(prevPosts => 
-                prevPosts.map(post => 
+            setPosts(prevPosts =>
+                prevPosts.map(post =>
                     post.id === postId ? { ...post, status: 'posted' } : post
                 )
             );
-            
+
             // Update post history
-            setPostHistory(prevHistory => 
+            setPostHistory(prevHistory =>
                 prevHistory.map(pushHistory => ({
                     ...pushHistory,
-                    posts: pushHistory.posts.map(post => 
+                    posts: pushHistory.posts.map(post =>
                         post.id === postId ? { ...post, status: 'posted' } : post
                     )
                 }))
             );
-            
+
             showNotification('Approved & Posted! ✅');
         } catch (error) {
             console.error('Error approving and posting:', error);
             showNotification('Error approving and posting');
         }
     };
+
 
     const getCurrentPush = () => {
         return postHistory.find(p => p.id === currentPushId);
@@ -347,9 +391,7 @@ const App: React.FC = () => {
                                 onRephrase={(id: string) => rephrasePost(id)}
                                 onApprove={(id: string) => handleApprove(id)}
                                 onDisapprove={(id: string) => updatePostStatus(id, 'disapproved')}
-                                onReadAloud={(_id: string) => {
-                                    showNotification('Read aloud feature coming soon');
-                                }}
+                                onReadAloud={() => {}} // Audio handled directly in PostCard
                             />
                         ))
                     ) : (

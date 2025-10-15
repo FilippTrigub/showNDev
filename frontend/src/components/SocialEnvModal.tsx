@@ -89,39 +89,43 @@ const SocialEnvModal: React.FC<SocialEnvModalProps> = ({
 
     return (
         <div
-            className={`fixed inset-0 z-50 transition-opacity ${isOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
+            className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity ${isOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
             aria-hidden={!isOpen}
         >
             <div
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                className="absolute inset-0 bg-black/40"
                 onClick={onClose}
                 role="presentation"
             />
-            <div className="relative flex min-h-full items-center justify-center p-4">
-                <div className="w-full max-w-3xl rounded-3xl bg-white/95 p-8 shadow-2xl">
-                    <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <h2 className="text-2xl font-semibold text-gray-900">Configure Social Media Credentials</h2>
-                            <p className="mt-2 text-sm text-gray-600">
-                                These values map directly to the backend environment variables and are cached locally for quick edits.
-                                Use “Copy .env snippet” to update <code>.env</code> for the FastAPI backend when you want them persisted outside this session.
-                            </p>
-                        </div>
+            <div className="relative w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-lg bg-white shadow-xl">
+                {/* Header */}
+                <div className="border-b border-gray-200 px-6 py-4">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-semibold text-gray-900">Social Media Credentials</h2>
                         <button
                             type="button"
-                            className="rounded-full bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                            className="text-gray-400 hover:text-gray-600 transition-colors"
                             onClick={onClose}
+                            aria-label="Close"
                         >
-                            Close
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                         </button>
                     </div>
+                    <p className="mt-1 text-sm text-gray-500">
+                        Configure API credentials for social media platforms. Changes sync with backend.
+                    </p>
+                </div>
 
-                    <div className="mt-6 space-y-6">
+                {/* Scrollable Content */}
+                <div className="overflow-y-auto max-h-[calc(90vh-180px)] px-6 py-4">
+                    <div className="space-y-6">
                         {SOCIAL_ENV_SECTIONS.map(section => (
-                            <section key={section.title} className="rounded-2xl bg-white/70 p-5 shadow-sm">
+                            <section key={section.title} className="border-b border-gray-100 pb-6 last:border-0">
                                 <div className="mb-4">
-                                    <h3 className="text-lg font-semibold text-gray-900">{section.title}</h3>
-                                    <p className="text-sm text-gray-600">{section.description}</p>
+                                    <h3 className="text-base font-medium text-gray-900">{section.title}</h3>
+                                    <p className="mt-1 text-sm text-gray-500">{section.description}</p>
                                 </div>
                                 <div className="grid gap-4 md:grid-cols-2">
                                     {section.fields.map(fieldKey => {
@@ -130,13 +134,11 @@ const SocialEnvModal: React.FC<SocialEnvModalProps> = ({
                                         const isConfigured = status[backendStatusKey];
                                         return (
                                             <label key={fieldKey} className="flex flex-col gap-2">
-                                                <span className="text-sm font-medium text-gray-700">
+                                                <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
                                                     {config.label}
-                                                    <span className="ml-2 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                                                        {config.envVar}
-                                                    </span>
-                                                    <span className={`ml-2 text-xs ${isConfigured ? 'text-emerald-500' : 'text-slate-400'}`}>
-                                                        {isConfigured ? 'Configured' : 'Not set'}
+                                                    <span className="text-xs text-gray-400">{config.envVar}</span>
+                                                    <span className={`ml-auto text-xs font-normal ${isConfigured ? 'text-green-600' : 'text-gray-400'}`}>
+                                                        {isConfigured ? '✓' : '○'}
                                                     </span>
                                                 </span>
                                                 <input
@@ -144,10 +146,10 @@ const SocialEnvModal: React.FC<SocialEnvModalProps> = ({
                                                     value={formValues[fieldKey]}
                                                     onChange={handleInputChange(fieldKey)}
                                                     placeholder={config.placeholder}
-                                                    className="w-full rounded-xl border border-gray-200 bg-white/80 px-4 py-2 text-sm shadow-inner focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                                                    className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                                 />
                                                 {config.helperText && (
-                                                    <span className="text-xs text-gray-500">{config.helperText}</span>
+                                                    <span className="text-xs text-gray-400">{config.helperText}</span>
                                                 )}
                                             </label>
                                         );
@@ -155,37 +157,45 @@ const SocialEnvModal: React.FC<SocialEnvModalProps> = ({
                                 </div>
                             </section>
                         ))}
-                    </div>
 
-                    <div className="mt-8 flex flex-wrap gap-3">
+                        {/* Preview Section */}
+                        <section className="pt-2">
+                            <h3 className="text-base font-medium text-gray-900 mb-3">.env Preview</h3>
+                            <div className="rounded border border-gray-200 bg-gray-50 p-3">
+                                <pre className="overflow-x-auto text-xs text-gray-700 font-mono">{envSnippet}</pre>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="border-t border-gray-200 px-6 py-4 bg-gray-50">
+                    <div className="flex items-center justify-between gap-3">
                         <button
                             type="button"
-                            className="modern-button rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-5 py-3 text-sm font-semibold text-white shadow-md hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
-                            onClick={handleSave}
-                            disabled={isSaving || isSyncing}
-                        >
-                            {isSaving ? 'Saving…' : 'Save Credentials'}
-                        </button>
-                        <button
-                            type="button"
-                            className="rounded-xl border border-indigo-200 px-5 py-3 text-sm font-semibold text-indigo-600 hover:bg-indigo-50"
-                            onClick={handleCopy}
-                            >
-                            Copy .env snippet
-                        </button>
-                        <button
-                            type="button"
-                            className="rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
                             onClick={handleClear}
                             disabled={isClearing || isSyncing}
                         >
-                            {isClearing ? 'Clearing…' : 'Clear stored values'}
+                            {isClearing ? 'Clearing…' : 'Clear All'}
                         </button>
-                    </div>
-
-                    <div className="mt-6 rounded-2xl bg-gray-900/90 p-4 text-sm text-gray-100">
-                        <p className="font-semibold text-indigo-300">Preview</p>
-                        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs">{envSnippet}</pre>
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                className="px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-600 rounded hover:bg-indigo-50 transition-colors"
+                                onClick={handleCopy}
+                            >
+                                Copy .env
+                            </button>
+                            <button
+                                type="button"
+                                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={handleSave}
+                                disabled={isSaving || isSyncing}
+                            >
+                                {isSaving ? 'Saving…' : 'Save'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

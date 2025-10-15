@@ -15,7 +15,7 @@ export interface Post {
     status: 'pending' | 'approved' | 'disapproved' | 'posted';
     media: Array<{
         url: string;
-        type: 'image' | 'video';
+        type: 'image' | 'video' | 'audio';
         caption?: string;
     }>;
     repository?: string;

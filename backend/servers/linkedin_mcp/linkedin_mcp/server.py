@@ -48,7 +48,7 @@ async def authenticate(ctx: Context = None) -> str:
 
     try:
         # Start callback server
-        callback_server = LinkedInCallbackServer(port=3000)
+        callback_server = LinkedInCallbackServer(port=8002)
         await callback_server.start()
 
         # Get auth URL

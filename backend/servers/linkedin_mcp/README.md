@@ -23,7 +23,7 @@ Post to LinkedIn directly from Claude Desktop with support for text and media at
    Visit https://www.linkedin.com/developers/apps
    Create new app
    Add product permissions: Log In to LinkedIn and Share on LinkedIn 
-   Configure OAuth redirect URL: http://localhost:3000/callback
+   Configure OAuth redirect URL: http://localhost:8002/callback
    ```
 
 2. Install
@@ -40,7 +40,7 @@ Post to LinkedIn directly from Claude Desktop with support for text and media at
    ```env
    LINKEDIN_CLIENT_ID=your_client_id
    LINKEDIN_CLIENT_SECRET=your_client_secret
-   LINKEDIN_REDIRECT_URI=http://localhost:3000/callback
+   LINKEDIN_REDIRECT_URI=http://localhost:8002/callback
    ```
 
 ## Claude Desktop Configuration
