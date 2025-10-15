@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Post } from '../types/shared';
+import ImageModal from './ImageModal';
 
 interface PostCardProps {
     post: Post;
@@ -20,6 +21,8 @@ const PostCard: React.FC<PostCardProps> = ({
     onReadAloud,
     onContentChange
 }) => {
+    const [selectedImage, setSelectedImage] = useState<{ url: string; caption?: string } | null>(null);
+
     const getPlatformAccent = (platform: string) => {
         switch (platform) {
             case 'LinkedIn':
@@ -62,16 +65,36 @@ const PostCard: React.FC<PostCardProps> = ({
             );
         }
 
+        // Separate media by type
+        const images = post.media.filter(m => m.type === 'image');
+        const videos = post.media.filter(m => m.type === 'video');
+        const audios = post.media.filter(m => m.type === 'audio');
+
         if (post.media.length === 1) {
             const media = post.media[0];
             return (
                 <div className="relative">
                     {media.type === 'image' ? (
-                        <img src={media.url} alt={media.caption || "Post Media"} className="w-full h-48 object-cover rounded-2xl" />
-                    ) : (
+                        <img
+                            src={media.url}
+                            alt={media.caption || "Post Media"}
+                            className="w-full h-48 object-cover rounded-2xl cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => setSelectedImage({ url: media.url, caption: media.caption })}
+                        />
+                    ) : media.type === 'video' ? (
                         <video src={media.url} className="w-full h-48 object-cover rounded-2xl" controls muted loop></video>
+                    ) : (
+                        <div className="flex h-48 w-full items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/70">
+                            <div className="text-center w-full px-4">
+                                <div className="mb-2 text-4xl">🎧</div>
+                                <audio src={media.url} controls className="w-full min-w-[300px] max-w-md mx-auto" style={{ minHeight: '40px' }} />
+                                {media.caption && (
+                                    <div className="mt-2 text-xs text-slate-400">{media.caption}</div>
+                                )}
+                            </div>
+                        </div>
                     )}
-                    {media.caption && (
+                    {media.caption && media.type !== 'audio' && (
                         <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-lg">
                             {media.caption}
                         </div>
@@ -80,32 +103,59 @@ const PostCard: React.FC<PostCardProps> = ({
             );
         }
 
-        // Multiple media items - show as carousel/grid
+        // Multiple media items - show images/videos in grid, audio separately
         return (
-            <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                    {post.media.slice(0, 4).map((media, index) => (
-                        <div key={index} className="relative">
-                            {media.type === 'image' ? (
-                                <img src={media.url} alt={media.caption || `Media ${index + 1}`} className="w-full h-24 object-cover rounded-xl" />
-                            ) : (
-                                <video src={media.url} className="w-full h-24 object-cover rounded-xl" muted></video>
-                            )}
-                            {media.caption && (
-                                <div className="absolute bottom-1 left-1 bg-black/70 text-white text-xs px-1 py-0.5 rounded">
-                                    {media.caption}
+            <div className="space-y-4">
+                {/* Images and Videos Grid */}
+                {(images.length > 0 || videos.length > 0) && (
+                    <div className="grid grid-cols-2 gap-2">
+                        {[...images, ...videos].slice(0, 4).map((media, index) => (
+                            <div key={index} className="relative">
+                                {media.type === 'image' ? (
+                                    <img
+                                        src={media.url}
+                                        alt={media.caption || `Media ${index + 1}`}
+                                        className="w-full h-24 object-cover rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
+                                        onClick={() => setSelectedImage({ url: media.url, caption: media.caption })}
+                                    />
+                                ) : (
+                                    <video src={media.url} className="w-full h-24 object-cover rounded-xl" muted></video>
+                                )}
+                                {media.caption && (
+                                    <div className="absolute bottom-1 left-1 bg-black/70 text-white text-xs px-1 py-0.5 rounded">
+                                        {media.caption}
+                                    </div>
+                                )}
+                                {index === 3 && (images.length + videos.length) > 4 && (
+                                    <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center text-white font-bold">
+                                        +{images.length + videos.length - 4}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Audio Items */}
+                {audios.length > 0 && (
+                    <div className="space-y-2">
+                        <div className="text-xs font-medium text-slate-400 uppercase tracking-wide">Audio Files ({audios.length})</div>
+                        {audios.map((audio, index) => (
+                            <div key={`audio-${index}`} className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+                                <div className="text-2xl">🎧</div>
+                                <div className="flex-1">
+                                    <audio src={audio.url} controls className="w-full min-w-[300px]" style={{ minHeight: '40px' }} />
+                                    {audio.caption && (
+                                        <div className="mt-1 text-xs text-slate-400">{audio.caption}</div>
+                                    )}
                                 </div>
-                            )}
-                            {index === 3 && post.media.length > 4 && (
-                                <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center text-white font-bold">
-                                    +{post.media.length - 4}
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
                 <div className="text-xs text-white/70 text-center">
-                    {post.media.length} media items from database
+                    {post.media.length} media items ({images.length} images, {videos.length} videos, {audios.length} audio)
                 </div>
             </div>
         );
@@ -158,21 +208,14 @@ const PostCard: React.FC<PostCardProps> = ({
             <div className="mt-6 flex gap-3">
                 <button
                     onClick={() => onRephrase(post.id)}
-                    disabled={post.status !== 'pending' || isLoading}
-                    className="modern-button flex-1 rounded-2xl bg-indigo-600 py-3 px-4 text-sm font-semibold text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={isLoading}
+                    className="modern-button w-full rounded-2xl bg-indigo-600 py-3 px-4 text-sm font-semibold text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {isLoading ? (
                         <div className="loading-spinner mx-auto"></div>
                     ) : (
                         <>✨ Rephrase</>
                     )}
-                </button>
-                <button
-                    onClick={() => onReadAloud(post.id)}
-                    disabled={post.status !== 'pending'}
-                    className="modern-button rounded-2xl bg-slate-800 py-3 px-6 text-sm font-semibold text-slate-100 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    🎧
                 </button>
             </div>
 
@@ -193,6 +236,13 @@ const PostCard: React.FC<PostCardProps> = ({
                     ❌ Reject
                 </button>
             </div>
+
+            {/* Image Modal */}
+            <ImageModal
+                imageUrl={selectedImage?.url || null}
+                caption={selectedImage?.caption}
+                onClose={() => setSelectedImage(null)}
+            />
         </div>
     );
 };

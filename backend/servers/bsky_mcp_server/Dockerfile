@@ -20,7 +20,7 @@ COPY . .
 RUN pnpm run build
 
 # Expose port if needed (optional, if the server listens on a port)
-# EXPOSE 3000
+# EXPOSE 8002
 
 # Start the server
 CMD ["node", "build/src/index.js"]

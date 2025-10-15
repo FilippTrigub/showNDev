@@ -21,7 +21,7 @@ export const defaultSocialEnvValues: SocialEnvValues = {
     blueskyServiceUrl: 'https://bsky.social',
     linkedinClientId: '',
     linkedinClientSecret: '',
-    linkedinRedirectUri: 'http://localhost:3000/callback',
+    linkedinRedirectUri: 'http://localhost:8002/callback',
 };
 
 export type SocialEnvFieldKey = keyof SocialEnvValues;
@@ -87,7 +87,7 @@ export const SOCIAL_ENV_FIELD_CONFIG: Record<SocialEnvFieldKey, SocialEnvFieldCo
     linkedinRedirectUri: {
         envVar: 'LINKEDIN_REDIRECT_URI',
         label: 'LinkedIn Redirect URI',
-        placeholder: 'http://localhost:3000/callback',
+        placeholder: 'http://localhost:8002/callback',
         type: 'url',
         helperText: 'Must match the redirect URI registered with LinkedIn.',
     },

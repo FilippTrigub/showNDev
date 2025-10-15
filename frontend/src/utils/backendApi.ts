@@ -15,6 +15,11 @@ export interface ContentItem {
     status: 'pending' | 'rephrased' | 'approved' | 'rejected' | 'published';
     created_at?: string;
     updated_at?: string;
+    // Media arrays from backend
+    image_content?: string[];  // Array of image URLs
+    video_content?: string[];  // Array of video URLs
+    audio_content?: string[];  // Array of base64 audio data
+    // Legacy media field (for backward compatibility)
     media?: Array<{
         url: string;
         type: 'image' | 'video';
@@ -258,10 +263,35 @@ export const getMockContentItems = (): ContentItem[] => [
     },
 ];
 
+// Read aloud content using TTS
+export const readAloudContent = async (contentId: string): Promise<string> => {
+    try {
+        const response = await fetchWithExponentialBackoff(`${BACKEND_URL}/content/${contentId}/read-aloud`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (!result.audio_base64) {
+            throw new Error('No audio data returned from TTS API');
+        }
+
+        return result.audio_base64;
+    } catch (error) {
+        console.error('Error in readAloudContent:', error);
+        throw error;
+    }
+};
+
 // Test backend connection
 export const testBackendConnection = async (): Promise<boolean> => {
     try {
-        const response = await fetch(`${BACKEND_URL}/health`, { 
+        const response = await fetch(`${BACKEND_URL}/health`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });

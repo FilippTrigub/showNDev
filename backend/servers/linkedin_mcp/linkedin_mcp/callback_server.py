@@ -63,7 +63,7 @@ class CallbackHandler(BaseHTTPRequestHandler):
 class LinkedInCallbackServer:
     """Server to handle LinkedIn OAuth callbacks."""
     
-    def __init__(self, port: int = 3000):
+    def __init__(self, port: int = 8002):
         self.port = port
         self.server: Optional[CallbackServer] = None
         # Use threading.Event instead of asyncio.Event for thread safety
